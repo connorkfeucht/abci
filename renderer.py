@@ -5,6 +5,7 @@ import pyvista as pv # high level wrapper around VTK for building and rendering 
 
 def plot_mesh(mesh):
     # Render & save screenshot
+    pv.start_xvfb()
     plotter = pv.Plotter(off_screen=True) # MAKES HEADLESS
     plotter.add_mesh(mesh, color="white")
     plotter.set_background("black")
