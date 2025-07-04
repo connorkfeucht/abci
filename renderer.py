@@ -65,10 +65,44 @@ def make_meshes(orig_dir, input_dir):
     os.chdir(orig_dir)
     return meshes
 
-def transform_meshes(meshes): # TODO: make it so that meshes cannot render inside eachother
-    transformed_meshes = [mesh.translate([random.randint(1,300), random.randint(1,300), random.randint(1,300)]) for mesh in meshes]
+def transform_meshes(meshes, translate_range=(0,200), min_sep=0.0, max_trials=500): # TODO: ADD MAX SEPARATION TO KEEP ITEMS MORE CLUSTERED TOGETHER
+    placed_bounds = []
+    transformed_meshes = []
+
+    for mesh in meshes:
+        orig_bounds = mesh.bounds
+        last_tx, last_ty, last_tz = 0.0, 0.0, 0.0
+        for _ in range(max_trials):
+            tx = random.uniform(*translate_range)
+            ty = random.uniform(*translate_range)
+            tz = random.uniform(*translate_range)
+            last_tx, last_ty, last_tz = tx, ty, tz
+
+            new_bounds = (
+                orig_bounds[0] + tx, orig_bounds[1] + tx,
+                orig_bounds[2] + ty, orig_bounds[3] + ty,
+                orig_bounds[4] + tz, orig_bounds[5] + tz
+            )   
+
+            # if new_bounds for mesh doesn't overlap other objects already placed, then add to new_bounds
+            if all(not overlap(new_bounds, b, min_sep) for b in placed_bounds):
+                placed_bounds.append(new_bounds)
+                moved = mesh.copy().translate([tx, ty, tz], inplace=False)
+                transformed_meshes.append(moved)
+                break
+        else: # if run out of trials for not overlapping, then accept overlap
+            moved = mesh.copy().translate([last_tx, last_ty, last_tz], inplace=False)
+            transformed_meshes.append(moved)
+    
     return transformed_meshes
 
+# return true if the objects overlap 
+def overlap(b1, b2, min_sep=0.0): # b = (xmin, xmax, ymin, ymax, zmin, zmax)
+    x_overlap = (b1[0] < b2[1] + min_sep) and (b1[1] + min_sep > b2[0])
+    y_overlap = (b1[2] < b2[3] + min_sep) and (b1[3] + min_sep > b2[2])
+    z_overlap = (b1[4] < b2[5] + min_sep) and (b1[5] + min_sep > b2[4])
+
+    return x_overlap and y_overlap and z_overlap
 
 def main(argc, argv):
     if argc != 2:
