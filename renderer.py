@@ -3,11 +3,18 @@ import sys # for command line arguments
 import numpy as np # array manipulation
 import pyvista as pv # high level wrapper around VTK for building and rendering 3d meshes
 
-def plot_mesh(mesh):
+import os
+import glob
+import random
+
+def plot_meshes(meshes):
     # Render & save screenshot
-    pv.start_xvfb()
+    # pv.start_xvfb() # UNCOMMENT FOR RUNNING ON COMPUTING CLUSTER
     plotter = pv.Plotter(off_screen=True) # MAKES HEADLESS
-    plotter.add_mesh(mesh, color="white")
+
+    for mesh in meshes:
+        plotter.add_mesh(mesh, color="white")
+
     plotter.set_background("black")
     plotter.camera_position = "iso" # can be "xy" "zy" or a point
     plotter.line_smoothing = True
@@ -43,14 +50,36 @@ def parse_mesh(filename):
 
     return mesh
 
+def make_meshes(orig_dir, input_dir):
+    meshes = []
+    if not os.path.isdir(input_dir):
+        print(f"Error: “{input_dir}” is not a directory.")
+        sys.exit(1)
+
+    os.chdir(input_dir)
+
+    for hdf5_file in glob.glob("*.hdf5"):
+        mesh = parse_mesh(hdf5_file)
+        meshes.append(mesh)
+
+    os.chdir(orig_dir)
+    return meshes
+
+def transform_meshes(meshes): # TODO: make it so that meshes cannot render inside eachother
+    transformed_meshes = [mesh.translate([random.randint(1,300), random.randint(1,300), random.randint(1,300)]) for mesh in meshes]
+    return transformed_meshes
+
 
 def main(argc, argv):
     if argc != 2:
-        print("please specify an argument.")
+        print("please specify an input directory as an argument.")
         sys.exit(1)
 
-    mesh = parse_mesh(argv[1])
-    plot_mesh(mesh)
+    orig_dir = os.getcwd()
+    input_dir = argv[1]
+    meshes = make_meshes(orig_dir, input_dir)
+    transformed_meshes = transform_meshes(meshes)
+    plot_meshes(transformed_meshes)
 
 
 if __name__ == "__main__":
