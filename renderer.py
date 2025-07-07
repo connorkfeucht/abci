@@ -28,11 +28,13 @@ def plot_meshes(meshes):
     for mesh in meshes:
         plotter.add_mesh(mesh, color="white")
 
-    plotter.set_background("black")
+    # plotter.set_background("black")
     plotter.camera_position = "iso" # can be "xy" "zy" or a point
     plotter.line_smoothing = True
     # might want to use image_scale at some point to make images smaller or larger
-    plotter.show(screenshot="output.png")
+    plotter.show(auto_close=False)
+    plotter.screenshot("output.png", transparent_background=True)
+    plotter.close()
 
     return
 
