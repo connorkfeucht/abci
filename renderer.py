@@ -7,6 +7,19 @@ import os
 import glob
 import random
 
+'''
+Things to implement:
+- lighting
+    - position, quantity, specular characteristics
+- depth image
+- background
+- domain randomization
+- image level augmentation
+- in plane rotation DONE
+- multiple objects in a scene together DONE
+
+'''
+# plots meshes to output.png
 def plot_meshes(meshes):
     # Render & save screenshot
     # pv.start_xvfb() # UNCOMMENT FOR RUNNING ON COMPUTING CLUSTER
@@ -23,6 +36,7 @@ def plot_meshes(meshes):
 
     return
 
+# parses individual mesh
 def parse_mesh(filename):
     with h5py.File(filename, "r") as f:
         mesh_root = f["parts"]["part_001"]["mesh"] # contains subgroups 000, 001, ... which each contain one small mesh
@@ -50,6 +64,7 @@ def parse_mesh(filename):
 
     return mesh
 
+# builds the meshes array by going through input dir
 def make_meshes(orig_dir, input_dir):
     meshes = []
     if not os.path.isdir(input_dir):
@@ -65,7 +80,8 @@ def make_meshes(orig_dir, input_dir):
     os.chdir(orig_dir)
     return meshes
 
-def transform_meshes(meshes, translate_range=(0,200), min_sep=0.0, max_trials=500): # TODO: ADD MAX SEPARATION TO KEEP ITEMS MORE CLUSTERED TOGETHER
+# transforms meshes randomly in the scene.
+def transform_meshes(meshes, translate_range=(0,150), min_sep=0.0, max_trials=500): # TODO: ADD MAX SEPARATION TO KEEP ITEMS MORE CLUSTERED TOGETHER
     placed_bounds = []
     transformed_meshes = []
 
@@ -82,7 +98,12 @@ def transform_meshes(meshes, translate_range=(0,200), min_sep=0.0, max_trials=50
                 orig_bounds[0] + tx, orig_bounds[1] + tx,
                 orig_bounds[2] + ty, orig_bounds[3] + ty,
                 orig_bounds[4] + tz, orig_bounds[5] + tz
-            )   
+            )
+            
+            # randomly rotates the object on all 3 axis
+            mesh.rotate_x(random.randint(0,360), inplace=True)
+            mesh.rotate_y(random.randint(0,360), inplace=True)
+            mesh.rotate_z(random.randint(0,360), inplace=True)
 
             # if new_bounds for mesh doesn't overlap other objects already placed, then add to new_bounds
             if all(not overlap(new_bounds, b, min_sep) for b in placed_bounds):
