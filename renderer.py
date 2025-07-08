@@ -8,6 +8,10 @@ import glob
 import random
 import math
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 '''
 Things to implement:
 - lighting
@@ -35,7 +39,31 @@ def plot_meshes(meshes):
     plotter.show(auto_close=False)
     plotter.screenshot("output.png", transparent_background=True)
     plotter.close()
+    return
 
+def plot_meshes_depth(meshes):
+    # pv.start_xvfb()
+    plotter = pv.Plotter(off_screen=True)
+
+    for mesh in meshes:
+        plotter.add_mesh(mesh, color=True)
+    
+    plotter.camera_position = "iso"
+    plotter.line_smoothing = True
+    plotter.image_store = True
+
+    plotter.show(auto_close=False)
+    depth = plotter.get_image_depth()
+    plotter.close()
+
+    # replace NaNs, normalize to [0,1]
+    depth = np.nan_to_num(depth, nan=0.0)
+    dmin, dmax = depth.min(), depth.ptp() or 1.0
+    norm = (depth - dmin) / dmax
+    # save as 8-bit grayscale PNG (nearer = brighter)
+    depth_img = (255 * (1.0 - norm)).astype(np.uint8)
+
+    plt.imsave("output.png", depth_img, cmap="gray", vmin=0, vmax=255)
     return
 
 # parses individual mesh
@@ -161,18 +189,20 @@ def compute_distance(b1, b2):
     euclidean_distance = math.sqrt(dx**2 + dy**2 + dz**2)
     return euclidean_distance
 
-
-
 def main(argc, argv):
-    if argc != 2:
-        print("please specify an input directory as an argument.")
+    if argc != 3:
+        print("please specify an input directory as an argument, and 0 or 1 for is_depth")
         sys.exit(1)
 
     orig_dir = os.getcwd()
     input_dir = argv[1]
+    is_depth = int(argv[2])
     meshes = make_meshes(orig_dir, input_dir)
     transformed_meshes = transform_meshes(meshes)
-    plot_meshes(transformed_meshes)
+    if is_depth == 0:
+        plot_meshes(transformed_meshes)
+    else:
+        plot_meshes_depth(transformed_meshes)
 
 
 if __name__ == "__main__":
