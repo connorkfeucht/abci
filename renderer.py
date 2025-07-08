@@ -16,8 +16,7 @@ import matplotlib.pyplot as plt
 Things to implement:
 - lighting
     - position, quantity, specular characteristics
-- depth image
-- background
+- depth image DONE
 - domain randomization
 - image level augmentation
 - in plane rotation DONE
@@ -30,7 +29,7 @@ def plot_meshes(meshes):
     plotter = pv.Plotter(off_screen=True) # MAKES HEADLESS
 
     for mesh in meshes:
-        plotter.add_mesh(mesh, color="white")
+        plotter.add_mesh(mesh, color="00ff60")
 
     # plotter.set_background("black")
     plotter.camera_position = "iso" # can be "xy" "zy" or a point
@@ -41,6 +40,7 @@ def plot_meshes(meshes):
     plotter.close()
     return
 
+# plots meshes as depth image to output.png
 def plot_meshes_depth(meshes):
     # pv.start_xvfb()
     plotter = pv.Plotter(off_screen=True)
@@ -203,7 +203,6 @@ def main(argc, argv):
         plot_meshes(transformed_meshes)
     else:
         plot_meshes_depth(transformed_meshes)
-
 
 if __name__ == "__main__":
     main(len(sys.argv), sys.argv)
