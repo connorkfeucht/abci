@@ -2,7 +2,7 @@ import pyvista as pv # high level wrapper around VTK for building and rendering 
 import numpy as np # array manipulation
 import matplotlib.pyplot as plt
 
-# plots meshes to output.png
+# plots multiple meshes to output.png
 def plot_meshes(meshes):
     # Render & save screenshot
     # pv.start_xvfb() # UNCOMMENT FOR RUNNING ON COMPUTING CLUSTER
@@ -20,7 +20,7 @@ def plot_meshes(meshes):
     plotter.close()
     return
 
-# plots meshes as depth image to output.png
+# plots multiple meshes as depth image to output.png
 def plot_meshes_depth(meshes):
     # pv.start_xvfb()
     plotter = pv.Plotter(off_screen=True)
@@ -44,4 +44,17 @@ def plot_meshes_depth(meshes):
     depth_img = (255 * (1.0 - norm)).astype(np.uint8)
 
     plt.imsave("output.png", depth_img, cmap="gray", vmin=0, vmax=255)
+    return
+
+def plot_mesh(mesh, output_path):
+    # pv.start_xvfb() # UNCOMMENT FOR RUNNING ON COMPUTING CLUSTER
+    plotter = pv.Plotter(off_screen=True)
+
+    plotter.add_mesh(mesh, color="00ff60")
+
+    plotter.set_background("black")
+    plotter.camera_position = "iso" # can be "xy" "zy" or a point
+    plotter.line_smoothing = True
+
+    plotter.show(screenshot=output_path)
     return

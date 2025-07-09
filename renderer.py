@@ -8,7 +8,7 @@ import glob
 import random
 
 
-from plotting_utils import plot_meshes, plot_meshes_depth
+from plotting_utils import plot_meshes, plot_meshes_depth, plot_mesh
 from spatial_utils import overlap, euclidean_distance
 '''
 Things to implement:
@@ -25,33 +25,57 @@ Things to implement:
 
 # parses individual mesh
 def parse_mesh(filename):
+    """
+    Open a .hdf5, look under every part_x/mesh subgroup, build Polydatas,
+    and merge them into one. Raises if it finds no valid sub-mesh.
+    """
     with h5py.File(filename, "r") as f:
-        mesh_root = f["parts"]["part_001"]["mesh"] # contains subgroups 000, 001, ... which each contain one small mesh
+        parts_grp = f.get("parts")
+        if parts_grp is None:
+            raise ValueError(f"{filename!r} has no top-level 'parts' group")
 
-        # Load each sub-mesh into a PolyData and collect them
         polys = []
-        for mesh_id in sorted(mesh_root.keys(), key=int): # get names like 000, 001, ... and sort them numerically
-            grp = mesh_root[mesh_id]
-            pts = grp["points"][...]       # shape (N,3), absolute coords of each vertex
-            tris = grp["triangle"][...]    # shape (M,3), how those vertices connect to form triangles, each value is a vertex's index in the pts array. 
+        # loop over every part (part_000, part_001, etc.)
+        for part_name, part_grp in parts_grp.items():
+            mesh_grp = part_grp.get("mesh")
+            if mesh_grp is None:
+                # no mesh in this part, skip
+                continue
 
-                    # VTK wants faces in "flat" format: [3, i0, i1, i2,  3, j0, j1, j2, ...]. prefixing each triangle with a 3.
-            faces = np.hstack([
-                np.concatenate([[3], tri.astype(np.int64)])
-                for tri in tris
-            ]) # loop over each triangle, prepend the count 3, cast to int64, then horizontally stack them all into one flat array
+            # loop over every sub-mesh in this mesh group
+            for mesh_id, sub in mesh_grp.items():
+                pts = sub.get("points")
+                tris = sub.get("triangle")
+                if pts is None or tris is None:
+                    continue
 
-            poly = pv.PolyData(pts, faces) # builds PolyData objects, which are the small meshes in parts 000, 001, ...
-            polys.append(poly)
+                pts = pts[...]
+                tris = tris[...]
 
-    # Merge all sub-meshes into one
-    mesh = polys[0]
-    for poly in polys[1:]:
-        mesh = mesh.merge(poly)
+                # skip empty
+                if pts.size == 0 or tris.size == 0:
+                    continue
 
-    return mesh
+                # build faces: shape (M,4) of [3, i0, i1, i2], then flatten
+                tris_int = tris.astype(np.int64)
+                counts   = np.full((tris_int.shape[0], 1), 3, np.int64)
+                faces    = np.hstack((counts, tris_int)).ravel()
 
-# builds the meshes array by going through input dir
+                poly = pv.PolyData(pts, faces)
+                polys.append(poly)
+
+        if not polys:
+            raise ValueError(f"No valid sub-meshes found in {filename!r}")
+
+        # merge them all
+        mesh = polys[0]
+        for poly in polys[1:]:
+            mesh = mesh.merge(poly)
+
+        return mesh
+
+
+# populates the meshes array to be used for images with multiple objects
 def make_meshes(orig_dir, input_dir):
     meshes = []
     if not os.path.isdir(input_dir):
@@ -112,21 +136,61 @@ def transform_meshes(meshes, translate_range=(0,200), min_sep=0.0, max_sep=50, m
     
     return transformed_meshes
 
+def abc(input_dir, output_dir):
+    meshes = {}
+    pattern = os.path.join(input_dir, "*", "*.hdf5")
 
+    if not os.path.isdir(input_dir):
+        print(f"Error: {input_dir} is not a directory.")
+        sys.exit(1)
+
+    for h5_path in glob.glob(pattern):
+        # random sampling to keep it small
+        if random.randint(1, 200) != 1:
+            continue
+
+        name = os.path.splitext(os.path.basename(h5_path))[0]
+        mesh = parse_mesh(h5_path)
+        meshes[name] = mesh
+
+    # render each mesh into output_dir
+    for name, mesh in meshes.items():
+        print("currently rendering:", name)
+        # build the output filepath
+        out_png = os.path.join(output_dir, f"{name}.png")
+        # assuming your plot_mesh takes (mesh, output_path)
+        plot_mesh(mesh, out_png)
+
+    return
+    
+
+# TODO: FIX SOME THINGS NOT WORKING:
+# can't run scene render on abc/ input. only on input/ (python3 renderer.py abc 1 0/1)
+# can't run single render on input/. only on abc/ (python3 renderer.py input 0 0/1)
+# works: python3 renderer.py input 1 0/1
+# works: python3 renderer.py abc 0 0/1
 def main(argc, argv):
-    if argc != 3:
-        print("please specify an input directory as an argument, and 0 or 1 for is_depth")
+    if argc != 4:
+        print("please specify an input directory as an argument, 0 or 1 for single or scene image, and 0 or 1 for rgb or depth.")
         sys.exit(1)
 
     orig_dir = os.getcwd()
     input_dir = argv[1]
-    is_depth = int(argv[2])
-    meshes = make_meshes(orig_dir, input_dir)
-    transformed_meshes = transform_meshes(meshes)
-    if is_depth == 0:
-        plot_meshes(transformed_meshes)
+    output_dir = os.path.join(orig_dir, "output")
+    os.makedirs(output_dir, exist_ok=True)
+
+    is_depth = int(argv[3])
+    is_scene = int(argv[2])
+    if is_scene == 1:
+        meshes = make_meshes(orig_dir, input_dir)
+        transformed_meshes = transform_meshes(meshes)
+        if is_depth == 0:
+            plot_meshes(transformed_meshes)
+        else:
+            plot_meshes_depth(transformed_meshes)
     else:
-        plot_meshes_depth(transformed_meshes)
+        abc(input_dir, output_dir)
+    
 
 if __name__ == "__main__":
     main(len(sys.argv), sys.argv)
